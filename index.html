@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Model Drawing Whiteboard</title>
+  <!-- Load html2canvas for saving as image -->
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 20px;
+      background-color: #f7f7f7;
+    }
+    .container {
+      max-width: 1200px;
+      margin: auto;
+    }
+    h2 {
+      text-align: center;
+    }
+    /* Whiteboard styling */
+    #whiteboard {
+      width: 95%;
+      max-width: 1000px;
+      height: 500px;
+      border: 2px solid #ccc;
+      background: white;
+      position: relative;
+      margin: 20px auto;
+      overflow: hidden;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    /* Header text area */
+    #headerText {
+      width: calc(100% - 20px);
+      margin: 10px auto;
+      height: 100px;
+      background: #f0f0f0;
+      border: 2px solid #ccc;
+      font-size: 20px;
+      overflow: auto;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    /* Controls container */
+    #controls {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    /* Draggable elements */
+    .draggable {
+      position: absolute;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      resize: both;
+      overflow: auto;
+      min-width: 50px;
+      min-height: 30px;
+      transform-origin: center center;
+    }
+    /* Text container for text boxes – borderless, transparent */
+    .text-container {
+      border: none;
+      background: transparent;
+      padding: 4px;
+      resize: none;
+    }
+    /* Editable text area – default font size 20px */
+    .draggable-text {
+      border: none;
+      background: transparent;
+      font-size: 20px;
+      outline: none;
+      width: 200px;
+      height: 50px;
+      box-sizing: border-box;
+    }
+    /* Rectangle styling */
+    .rectangle {
+      background-color: lightblue;
+      border: 2px solid #888;
+      resize: none;
+    }
+    /* Brace styling */
+    .brace {
+      width: 100px;
+      height: 50px;
+      resize: none;
+      background: none;
+      padding: 0;
+      margin: 0;
+    }
+    /* Rotation handle */
+    .rotate-handle {
+      width: 15px;
+      height: 15px;
+      background: #f00;
+      position: absolute;
+      top: 0;
+      right: 0;
+      cursor: grab;
+      border-radius: 50%;
+    }
+    /* Selection outlines */
+    .draggable.text-container.selected .draggable-text {
+      outline: 1px dashed red;
+    }
+    .selected:not(.text-container) {
+      outline: 2px dashed red;
+    }
+    /* Fraction styling for fraction button */
+    .fraction {
+      display: inline-block;
+      vertical-align: middle;
+      text-align: center;
+      font-size: 0.8em;
+    }
+    .fraction .numerator {
+      display: block;
+      border-bottom: 1px solid black;
+      padding: 0 2px;
+    }
+    .fraction .denom {
+      display: block;
+      padding: 0 2px;
+    }
+    /* Modern button styles */
+    button {
+      font-size: 16px;
+      margin: 5px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:active {
+      transform: scale(0.98);
+    }
+    /* Operator buttons container */
+    #calcButtons {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 10px 0;
+    }
+    /* Save and Clear buttons */
+    #calcButtons button.save {
+      background-color: #28a745;
+    }
+    #calcButtons button.clear {
+      background-color: #dc3545;
+    }
+    /* Container for Parts & Length panels with a border */
+    #dimensionControls {
+      display: inline-block;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin: 10px auto;
+    }
+    /* Always visible control panels inside dimensionControls */
+    #partsControls, #lengthControls {
+      display: inline-block;
+      margin: 10px;
+    }
+    /* Responsive tweaks */
+    @media (max-width: 600px) {
+      #whiteboard {
+        height: 400px;
+      }
+      #headerText {
+        height: 80px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Model Drawing Whiteboard</h2>
+    <!-- Controls container -->
+    <div id="controls">
+      <!-- Main controls -->
+      <div id="mainControls">
+        <button onclick="WhiteboardApp.addText()">Add Text</button>
+        <button onclick="WhiteboardApp.addRectangle()">Add Rectangle</button>
+        <button onclick="WhiteboardApp.addBrace()">Add Brace</button>
+        <button onclick="WhiteboardApp.deleteSelected()">Delete</button>
+        <button onclick="WhiteboardApp.duplicateSelected()">Copy</button>
+        <button onclick="WhiteboardApp.increaseFont()">aA+</button>
+        <button onclick="WhiteboardApp.decreaseFont()">aA-</button>
+      </div>
+      <!-- Operator buttons -->
+      <div id="calcButtons">
+        <button onclick="WhiteboardApp.insertFraction()">
+          <span class="fraction">
+            <span class="numerator">a</span>
+            <span class="denom">b</span>
+          </span>
+        </button>
+        <button onclick="WhiteboardApp.insertOperator('+')">+</button>
+        <button onclick="WhiteboardApp.insertOperator('-')">-</button>
+        <button onclick="WhiteboardApp.insertOperator('x')">x</button>
+        <button onclick="WhiteboardApp.insertOperator('÷')">÷</button>
+        <button onclick="WhiteboardApp.insertOperator('=')">=</button>
+        <button class="save" onclick="WhiteboardApp.saveBoard()">Save</button>
+        <button class="clear" onclick="WhiteboardApp.clearBoard()">Clear</button>
+      </div>
+      <!-- Dimension Controls: Parts & Length row enclosed in a bordered container -->
+      <div id="dimensionControls">
+        <div id="partsControls">
+          <label>Parts:</label>
+          <button onclick="WhiteboardApp.changeParts(-1)">&#9660;</button>
+          <span id="partsValue">1</span>
+          <button onclick="WhiteboardApp.changeParts(1)">&#9650;</button>
+          <label style="margin-left: 20px;">Filled:</label>
+          <button onclick="WhiteboardApp.changeFilled(-1)">&#9660;</button>
+          <span id="filledValue">0</span>
+          <button onclick="WhiteboardApp.changeFilled(1)">&#9650;</button>
+        </div>
+        <div id="lengthControls">
+          <label>Length:</label>
+          <button onclick="WhiteboardApp.changeLength(-1)">&#9660;</button>
+          <span id="lengthValue">1</span>
+          <button onclick="WhiteboardApp.changeLength(1)">&#9650;</button>
+        </div>
+      </div>
+    </div>
+    <!-- Whiteboard canvas -->
+    <div id="whiteboard" tabindex="0">
+      <div id="headerText" contenteditable="true">Insert Text</div>
+    </div>
+  </div>
+  <script>
+    const WhiteboardApp = (function() {
+      let selectedElement = null;
+      const whiteboard = document.getElementById("whiteboard");
+
+      // --- Selection & Deletion ---
+      function selectElement(el) {
+        if (selectedElement) {
+          selectedElement.classList.remove("selected");
+        }
+        selectedElement = el;
+        if (selectedElement) {
+          selectedElement.classList.add("selected");
+        }
+        if (selectedElement) {
+          if (selectedElement.classList.contains("rectangle")) {
+            const parts = parseInt(selectedElement.dataset.parts) || 1;
+            const filled = parseInt(selectedElement.dataset.filled) || 0;
+            const length = parseInt(selectedElement.dataset.length) || 1;
+            document.getElementById("partsValue").textContent = parts;
+            document.getElementById("filledValue").textContent = filled;
+            document.getElementById("lengthValue").textContent = length;
+          } else if (selectedElement.classList.contains("brace")) {
+            const length = parseInt(selectedElement.dataset.length) || 1;
+            document.getElementById("lengthValue").textContent = length;
+          }
+        }
+      }
+
+      function deleteSelected() {
+        if (selectedElement && selectedElement.classList.contains("text-container")) {
+          return;
+        }
+        if (selectedElement && selectedElement.id !== "headerText") {
+          selectedElement.parentNode.removeChild(selectedElement);
+          selectedElement = null;
+        } else {
+          alert("No element selected for deletion or header cannot be deleted.");
+        }
+      }
+
+      function duplicateSelected() {
+        if (!selectedElement) {
+          alert("No element selected to duplicate.");
+          return;
+        }
+        const clone = selectedElement.cloneNode(true);
+        const origLeft = parseInt(selectedElement.style.left) || 0;
+        const origTop = parseInt(selectedElement.style.top) || 0;
+        clone.style.left = (origLeft + 20) + "px";
+        clone.style.top = (origTop + 20) + "px";
+        clone.classList.remove("selected");
+        clone.addEventListener("click", function(e) {
+          selectElement(clone);
+          e.stopPropagation();
+        });
+        if (clone.getAttribute("contenteditable") === "true") {
+          clone.addEventListener("focus", () => selectElement(clone));
+        }
+        const handle = clone.querySelector(".rotate-handle");
+        if (handle) {
+          makeRotatable(clone, handle);
+        }
+        whiteboard.appendChild(clone);
+        makeDraggable(clone);
+        selectElement(clone);
+      }
+
+      // --- Text Creation (Borderless, Movable, Font 20px) ---
+      function addText() {
+        const container = document.createElement("div");
+        container.classList.add("draggable", "text-container");
+        container.style.left = "10px";
+        container.style.top = "70px";
+        container.style.width = "220px";
+        container.style.height = "70px";
+        container.style.resize = "none";
+
+        const textArea = document.createElement("div");
+        textArea.classList.add("draggable-text");
+        textArea.contentEditable = "true";
+        textArea.style.fontSize = "20px";
+        textArea.innerHTML = "Enter text...";
+
+        container.appendChild(textArea);
+
+        container.addEventListener("click", function(e) {
+          selectElement(container);
+          e.stopPropagation();
+        });
+
+        textArea.addEventListener("mousedown", function(e) {
+          e.stopPropagation();
+        });
+
+        whiteboard.appendChild(container);
+        makeDraggable(container);
+      }
+
+      // --- Rectangle & Brace Creation ---
+      function addRectangle() {
+        const rect = document.createElement("div");
+        rect.classList.add("draggable", "rectangle");
+        rect.style.left = "10px";
+        rect.style.top = "120px";
+        rect.dataset.length = 1;
+        rect.style.width = (100 * 1) + "px";
+        rect.style.height = "50px";
+        rect.style.resize = "none";
+        rect.dataset.parts = 1;
+        rect.dataset.filled = 0;
+        updateRectangleSegments(rect);
+        rect.addEventListener("click", function(e) {
+          selectElement(rect);
+          e.stopPropagation();
+        });
+        whiteboard.appendChild(rect);
+        makeDraggable(rect);
+      }
+
+      function addBrace() {
+        const brace = document.createElement("div");
+        brace.classList.add("draggable", "brace");
+        brace.style.left = "10px";
+        brace.style.top = "180px";
+        brace.dataset.length = 1;
+        brace.style.width = (100 * 1) + "px";
+        brace.style.height = "50px";
+        brace.style.resize = "none";
+        brace.innerHTML = generateBraceSVG(1);
+        brace.addEventListener("click", function(e) {
+          selectElement(brace);
+          e.stopPropagation();
+        });
+        whiteboard.appendChild(brace);
+        makeDraggable(brace);
+      }
+
+      // --- Generate SVG for Brace (dynamic based on length) ---
+      function generateBraceSVG(len) {
+        const viewBoxWidth = 100 * len;
+        const leftFlatEnd = (viewBoxWidth - 10) / 2;
+        const rightFlatStart = leftFlatEnd + 10;
+        const path = `M0,20 L${leftFlatEnd},20 L${leftFlatEnd+5},10 L${rightFlatStart},20 L${viewBoxWidth},20`;
+        return `
+          <svg width="100%" height="100%" viewBox="0 0 ${viewBoxWidth} 40" xmlns="http://www.w3.org/2000/svg">
+            <path d="${path}" stroke="black" stroke-width="2" fill="none" />
+          </svg>
+        `;
+      }
+
+      // --- Parts & Filled Controls ---
+      function changeParts(delta) {
+        if (!selectedElement || !selectedElement.classList.contains("rectangle")) return;
+        let parts = parseInt(selectedElement.dataset.parts) || 1;
+        let filled = parseInt(selectedElement.dataset.filled) || 0;
+        parts += delta;
+        if (parts < 1) parts = 1;
+        if (parts > 20) parts = 20;
+        if (filled > parts) filled = parts;
+        selectedElement.dataset.parts = parts;
+        selectedElement.dataset.filled = filled;
+        document.getElementById("partsValue").textContent = parts;
+        document.getElementById("filledValue").textContent = filled;
+        updateRectangleSegments(selectedElement);
+      }
+
+      function changeFilled(delta) {
+        if (!selectedElement || !selectedElement.classList.contains("rectangle")) return;
+        let filled = parseInt(selectedElement.dataset.filled) || 0;
+        const parts = parseInt(selectedElement.dataset.parts) || 1;
+        filled += delta;
+        if (filled < 0) filled = 0;
+        if (filled > parts) filled = parts;
+        selectedElement.dataset.filled = filled;
+        document.getElementById("filledValue").textContent = filled;
+        updateRectangleSegments(selectedElement);
+      }
+
+      function updateRectangleSegments(rect) {
+        const parts = parseInt(rect.dataset.parts) || 1;
+        const filled = parseInt(rect.dataset.filled) || 0;
+        rect.innerHTML = "";
+        for (let i = 0; i < parts; i++) {
+          const segment = document.createElement("div");
+          segment.style.width = (100 / parts) + "%";
+          segment.style.height = "100%";
+          segment.style.display = "inline-block";
+          segment.style.verticalAlign = "top";
+          segment.style.borderRight = "1px solid black";
+          segment.style.boxSizing = "border-box";
+          segment.style.backgroundColor = (i < filled) ? "lightgreen" : "white";
+          if (i === parts - 1) {
+            segment.style.borderRight = "none";
+          }
+          rect.appendChild(segment);
+        }
+      }
+
+      // --- Length Control (for rectangles and braces) ---
+      function changeLength(delta) {
+        if (!selectedElement || 
+            (!selectedElement.classList.contains("rectangle") && 
+             !selectedElement.classList.contains("brace"))) return;
+        let len = parseInt(selectedElement.dataset.length) || 1;
+        len += delta;
+        if (len < 1) len = 1;
+        if (len > 20) len = 20;
+        selectedElement.dataset.length = len;
+        document.getElementById("lengthValue").textContent = len;
+        if (selectedElement.classList.contains("rectangle")) {
+          selectedElement.style.width = (100 * len) + "px";
+          updateRectangleSegments(selectedElement);
+        } else if (selectedElement.classList.contains("brace")) {
+          selectedElement.style.width = (100 * len) + "px";
+          selectedElement.innerHTML = generateBraceSVG(len);
+        }
+      }
+
+      // --- Fraction Insertion for Text Editing ---
+      function insertFraction() {
+        let target;
+        if (selectedElement && selectedElement.classList.contains("text-container")) {
+          target = selectedElement.querySelector(".draggable-text");
+        } else if (document.activeElement && document.activeElement.isContentEditable) {
+          target = document.activeElement;
+        } else {
+          target = document.getElementById("headerText");
+        }
+        target.focus();
+        const fractionHTML = `
+          <span class="fraction">
+            <span class="numerator">&nbsp;</span>
+            <span class="denom">&nbsp;</span>
+          </span>&nbsp;
+        `;
+        document.execCommand("insertHTML", false, fractionHTML);
+      }
+
+      // --- Font & Operator Insertion ---
+      function increaseFont() {
+        let element;
+        if (selectedElement && selectedElement.querySelector(".draggable-text")) {
+          element = selectedElement.querySelector(".draggable-text");
+        } else if (selectedElement && selectedElement.getAttribute("contenteditable") === "true") {
+          element = selectedElement;
+        } else {
+          element = document.getElementById("headerText");
+        }
+        let currentSize = parseInt(window.getComputedStyle(element).fontSize);
+        element.style.fontSize = (currentSize + 2) + "px";
+      }
+
+      function decreaseFont() {
+        let element;
+        if (selectedElement && selectedElement.querySelector(".draggable-text")) {
+          element = selectedElement.querySelector(".draggable-text");
+        } else if (selectedElement && selectedElement.getAttribute("contenteditable") === "true") {
+          element = selectedElement;
+        } else {
+          element = document.getElementById("headerText");
+        }
+        let currentSize = parseInt(window.getComputedStyle(element).fontSize);
+        element.style.fontSize = (currentSize - 2) + "px";
+      }
+
+      function insertOperator(op) {
+        let target;
+        if (selectedElement && selectedElement.classList.contains("text-container")) {
+          target = selectedElement.querySelector(".draggable-text");
+        } else if (selectedElement && selectedElement.getAttribute("contenteditable") === "true") {
+          target = selectedElement;
+        } else if (document.activeElement && document.activeElement.isContentEditable) {
+          target = document.activeElement;
+        } else {
+          target = document.getElementById("headerText");
+        }
+        target.focus();
+        document.execCommand("insertText", false, op);
+      }
+
+      // --- Draggable & Rotatable ---
+      function makeDraggable(element) {
+        let offsetX = 0, offsetY = 0, isDragging = false;
+        element.addEventListener("mousedown", function(e) {
+          if (e.target.classList.contains("rotate-handle")) return;
+          const rect = element.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const clickY = e.clientY - rect.top;
+          const resizeMargin = 20;
+          if (clickX > rect.width - resizeMargin && clickY > rect.height - resizeMargin) return;
+          isDragging = true;
+          offsetX = e.clientX - element.offsetLeft;
+          offsetY = e.clientY - element.offsetTop;
+          selectElement(element);
+          e.preventDefault();
+        });
+        document.addEventListener("mousemove", function(e) {
+          if (!isDragging) return;
+          element.style.left = (e.clientX - offsetX) + "px";
+          element.style.top = (e.clientY - offsetY) + "px";
+        });
+        document.addEventListener("mouseup", function() {
+          isDragging = false;
+        });
+        element.addEventListener("touchstart", function(e) {
+          const touch = e.touches[0];
+          const rect = element.getBoundingClientRect();
+          const clickX = touch.clientX - rect.left;
+          const clickY = touch.clientY - rect.top;
+          const resizeMargin = 20;
+          if (clickX > rect.width - resizeMargin && clickY > rect.height - resizeMargin) return;
+          isDragging = true;
+          offsetX = touch.clientX - element.offsetLeft;
+          offsetY = touch.clientY - element.offsetTop;
+        });
+        element.addEventListener("touchmove", function(e) {
+          if (!isDragging) return;
+          const touch = e.touches[0];
+          element.style.left = (touch.clientX - offsetX) + "px";
+          element.style.top = (touch.clientY - offsetY) + "px";
+        });
+        element.addEventListener("touchend", function() {
+          isDragging = false;
+        });
+      }
+
+      function makeRotatable(element, rotateHandle) {
+        let isRotating = false;
+        rotateHandle.addEventListener("mousedown", function(e) {
+          e.stopPropagation();
+          isRotating = true;
+        });
+        document.addEventListener("mousemove", function(e) {
+          if (!isRotating) return;
+          const rect = element.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          const rad = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+          const deg = rad * (180 / Math.PI);
+          element.style.transform = `rotate(${deg}deg)`;
+        });
+        document.addEventListener("mouseup", function() {
+          isRotating = false;
+        });
+        rotateHandle.addEventListener("touchstart", function(e) {
+          e.stopPropagation();
+          isRotating = true;
+        });
+        document.addEventListener("touchmove", function(e) {
+          if (!isRotating) return;
+          const touch = e.touches[0];
+          const rect = element.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          const rad = Math.atan2(touch.clientY - centerY, touch.clientX - centerX);
+          const deg = rad * (180 / Math.PI);
+          element.style.transform = `rotate(${deg}deg)`;
+        });
+        document.addEventListener("touchend", function() {
+          isRotating = false;
+        });
+      }
+
+      // --- Clear & Save (no Load) ---
+      function clearBoard() {
+        if (!confirm("Are you sure you want to clear the board?")) return;
+        Array.from(whiteboard.children).forEach(child => {
+          if (child.id !== "headerText") {
+            whiteboard.removeChild(child);
+          }
+        });
+        selectedElement = null;
+      }
+
+      function saveBoard() {
+        html2canvas(whiteboard).then(function(canvas) {
+          const dataURL = canvas.toDataURL("image/jpeg");
+          const a = document.createElement("a");
+          a.href = dataURL;
+          a.download = "whiteboard.jpg";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(dataURL);
+        });
+      }
+
+      whiteboard.addEventListener("click", function(e) {
+        if (e.target.id !== "headerText") {
+          if (selectedElement) {
+            selectedElement.classList.remove("selected");
+            selectedElement = null;
+          }
+        }
+      });
+
+      // Listen for paste events to allow image paste
+      document.addEventListener("paste", function(e) {
+        const items = e.clipboardData && e.clipboardData.items;
+        if (items) {
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf("image") !== -1) {
+              const blob = items[i].getAsFile();
+              const imgContainer = document.createElement("div");
+              imgContainer.classList.add("draggable");
+              imgContainer.style.resize = "both";
+              imgContainer.style.overflow = "auto";
+              imgContainer.style.left = "50px";
+              imgContainer.style.top = "50px";
+              imgContainer.style.width = "300px";
+              imgContainer.style.height = "300px";
+              imgContainer.addEventListener("click", function(e) {
+                selectElement(imgContainer);
+                e.stopPropagation();
+              });
+              const img = document.createElement("img");
+              img.src = URL.createObjectURL(blob);
+              img.style.width = "100%";
+              img.style.height = "100%";
+              img.style.display = "block";
+              imgContainer.appendChild(img);
+              whiteboard.appendChild(imgContainer);
+              makeDraggable(imgContainer);
+              break;
+            }
+          }
+        }
+      });
+
+      return {
+        addText,
+        addRectangle,
+        addBrace,
+        deleteSelected,
+        duplicateSelected,
+        increaseFont,
+        decreaseFont,
+        insertOperator,
+        insertFraction,
+        clearBoard,
+        saveBoard,
+        changeParts,
+        changeFilled,
+        changeLength
+      };
+    })();
+  </script>
+</body>
+</html>
